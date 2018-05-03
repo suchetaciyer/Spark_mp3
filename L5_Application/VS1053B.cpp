@@ -72,23 +72,17 @@ void mp3_hardwareReset()
 void mp3_dreq_init()
 {
     dreqPin.setAsInput();
-    /*LPC_PINCON->PINSEL3 &= ~(3 << 8); //reset bits 8 and 9 in PINSEL3 for GPIO on pin P1.22
-     LPC_GPIO1->FIODIR |= (1 << 20); //set as output - P1.20
-     LPC_GPIO1->FIOCLR |= (1 << 20); //set as 0 to select  P1.20*/
-}
+ }
 
 bool mp3_dreq_getLevel()
 {
     return dreqPin.getLevel();
-    /*LPC_PINCON->PINSEL3 &= ~(3 << 8); //reset bits 8 and 9 in PINSEL3 for GPIO on pin P1.22
-     LPC_GPIO1->FIODIR |= (1 << 20); //set as output - P1.20
-     LPC_GPIO1->FIOCLR |= (1 << 20); //set as 0 to select  P1.20*/
 }
 
 bool mp3_initDecoder()
 {
     mp3_writeRequest(SCI_MODE, 0x4800);
-    mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8
+    mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8, BBE8
     mp3_writeRequest(SCI_VOL, 0x0000); //full vol
     mp3_writeRequest(SCI_BASS, 0x00F6);
     mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45

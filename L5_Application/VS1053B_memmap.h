@@ -30,6 +30,8 @@
 #define READ 0x03
 #define WRITE 0x02
 
-#define SEND_NUM_BYTES 128
+//static uint8_t SEND_NUM_BYTES = 32;
+static uint16_t READ_BYTES_FROM_FILE = 4096;
+static uint16_t TRANSMIT_BYTES_TO_DECODER = 32;
 
 #endif /* VS1053B_MEMMAP_H_ */
