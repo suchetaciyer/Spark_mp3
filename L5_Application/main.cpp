@@ -192,22 +192,32 @@ void vbufferSong(void * pvParameters)
     }
 }
 
-
 void vgetSong(void * pvParameters)
 {
     unsigned char current_byte[READ_BYTES_FROM_FILE];  //static unsigned char *p; p = &HelloMP3[0];
     static unsigned long offset = 0;
     // int i;
-    //unsigned long sz = Storage::getfileinfo("1:perfect.mp3");
-    //u0_dbg_printf("%lu ", sz);
+    unsigned long filesize = Storage::getfileinfo("1:kaun.mp3");
+    //u0_dbg_printf("%lu ", filesize);
     while (1) {
-        //current_byte = *p; p++;
-        if (xSemaphoreTake(LabSPI::spi_mutex, portMAX_DELAY)) {
-            Storage::read("1:perfect.mp3", &current_byte[0], READ_BYTES_FROM_FILE, offset);
-            xSemaphoreGive(LabSPI::spi_mutex);
-            bool sent = xQueueSend(musicQueue, &current_byte, portMAX_DELAY);
-            if (!sent) u0_dbg_printf("sf");
-            offset += READ_BYTES_FROM_FILE;
+
+        if ((filesize - offset) > READ_BYTES_FROM_FILE) {
+            if (xSemaphoreTake(LabSPI::spi_mutex, portMAX_DELAY)) {
+                Storage::read("1:kaun.mp3", &current_byte[0], READ_BYTES_FROM_FILE, offset);
+                xSemaphoreGive(LabSPI::spi_mutex);
+                bool sent = xQueueSend(musicQueue, &current_byte, portMAX_DELAY);
+                if (!sent) u0_dbg_printf("sf");
+                offset += READ_BYTES_FROM_FILE;
+            }
+        }
+        else {
+            if (xSemaphoreTake(LabSPI::spi_mutex, portMAX_DELAY)) {
+                Storage::read("1:kaun.mp3", &current_byte[0], (filesize - offset), offset);
+                xSemaphoreGive(LabSPI::spi_mutex);
+                bool sent = xQueueSend(musicQueue, &current_byte, portMAX_DELAY);
+                if (!sent) u0_dbg_printf("sf");
+                offset = 0;
+            }
         }
     }
 
@@ -222,7 +232,7 @@ void vplaySong(void * pvParameters)
     //static int offset = 0;
     uint8_t receivedByte[READ_BYTES_FROM_FILE];
     //uint8_t transmitByte[READ_BYTES_FROM_FILE];
-    uint32_t j=0;
+    uint32_t j = 0;
     while (1) {
 
         if (current_count == 0) {
@@ -237,7 +247,6 @@ void vplaySong(void * pvParameters)
             //Maybe set the volume or whatever...
 
         }
-
 
         //Once DREQ is released (high) we can now send 32 bytes of data
 
@@ -260,9 +269,9 @@ void vplaySong(void * pvParameters)
             mp3_data_ds(); //Deselect Data
             xSemaphoreGive(LabSPI::spi_mutex);
 
-            if (current_count == (COUNT-1)) {
+            if (current_count == (COUNT - 1)) {
                 current_count = 0;
-                j=0;
+                j = 0;
             }
             else {
                 current_count += 1;

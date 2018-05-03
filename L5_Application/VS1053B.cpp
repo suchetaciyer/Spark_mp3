@@ -84,7 +84,7 @@ bool mp3_initDecoder()
     mp3_writeRequest(SCI_MODE, 0x4800);
     mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8, BBE8
     mp3_writeRequest(SCI_VOL, 0x0000); //full vol
-    mp3_writeRequest(SCI_BASS, 0x00F6);
+    mp3_writeRequest(SCI_BASS, 0x7A00); //was 00F6
     mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45
 
     return false;
