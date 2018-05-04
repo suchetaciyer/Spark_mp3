@@ -20,16 +20,12 @@ void mp3_cs()
 {
     chipSelect.setAsOutput();
     chipSelect.setLow();
-    /*LPC_PINCON->PINSEL3 &= ~(3 << 12); //reset bits 12 and 13 in PINSEL3 for GPIO on pin P1.22
-     LPC_GPIO1->FIODIR |= (1 << 22); //set as output - P1.22
-     LPC_GPIO1->FIOCLR |= (1 << 22); //set as 0 to select  P1.22*/
 }
 
 //disabling Chip select by writing a high to pin P1.22
 void mp3_ds()
 {
     chipSelect.setHigh();
-    //LPC_GPIO1->FIOSET |= (1 << 22); //set as 1 to de-select
 }
 
 //enabling Chip select by writing a low to pin P1.20
@@ -37,16 +33,12 @@ void mp3_data_cs()
 {
     dataChipSelect.setAsOutput();
     dataChipSelect.setLow();
-    /*LPC_PINCON->PINSEL3 &= ~(3 << 8); //reset bits 8 and 9 in PINSEL3 for GPIO on pin P1.22
-     LPC_GPIO1->FIODIR |= (1 << 20); //set as output - P1.20
-     LPC_GPIO1->FIOCLR |= (1 << 20); //set as 0 to select  P1.20*/
 }
 
 //disabling Chip select by writing a low to pin P1.20
 void mp3_data_ds()
 {
     dataChipSelect.setHigh();
-    //LPC_GPIO1->FIOSET |= (1 << 20); //set as 1 to de-select
 }
 
 //reset
@@ -83,9 +75,9 @@ bool mp3_initDecoder()
 {
     mp3_writeRequest(SCI_MODE, 0x4800);
     mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8, BBE8
-    mp3_writeRequest(SCI_VOL, 0x0000); //full vol
-    mp3_writeRequest(SCI_BASS, 0x7A00); //was 00F6
-    mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45
+    mp3_writeRequest(SCI_VOL, 0x00FF); //full vol
+    mp3_writeRequest(SCI_BASS, 0x0076); //was 00F6
+    mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45,AC80, BB80-check
 
     return false;
 }
