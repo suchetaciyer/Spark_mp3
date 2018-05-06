@@ -2,8 +2,10 @@
  * VS1053B.c
  *
  *  Created on: Apr 24, 2018
- *      Author: Sneha
+ *      Author: Sucheta
  */
+
+
 #include "VS1053B.hpp"
 #include "LPC17xx.h"
 #include "LabGPIO.hpp"
@@ -13,7 +15,6 @@ LabGPIO chipSelect = LabGPIO(1, 22);
 LabGPIO dataChipSelect = LabGPIO(1, 20);
 LabGPIO chipReset = LabGPIO(1, 19);
 LabGPIO dreqPin = LabGPIO(2, 7);
-
 
 //enabling Chip select by writing a low to pin P1.22
 void mp3_cs()
@@ -75,7 +76,7 @@ bool mp3_initDecoder()
 {
     mp3_writeRequest(SCI_MODE, 0x4800);
     mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8, BBE8
-    mp3_writeRequest(SCI_VOL, 0x00FF); //full vol
+    mp3_writeRequest(SCI_VOL, 0x0000); //full vol
     mp3_writeRequest(SCI_BASS, 0x0076); //was 00F6
     mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45,AC80, BB80-check
 

@@ -1,5 +1,5 @@
 /*
- * LabGPIO_0.hpp
+ * LabGPIO.hpp
  *
  *  Created on: Feb 15, 2018
  *      Author: Sucheta

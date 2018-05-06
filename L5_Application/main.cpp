@@ -24,25 +24,24 @@
  *
  */
 #include "tasks.hpp"
-#include "examples/examples.hpp"
-
 #include "LabSPI.hpp"
 #include "printf_lib.h"
-
 #include "semphr.h"
 #include "VS1053B_memmap.h"
 #include "VS1053B.hpp"
 #include "song.hpp"
-
 #include "storage.hpp"
 #include "string.h"
+#include "uart2.hpp"
+#include "BT_message.hpp"
+#include "ffconf.h"
 
 uint8_t COUNT = READ_BYTES_FROM_FILE / TRANSMIT_BYTES_TO_DECODER;  //Divided by 128 because the decoder decodes only if maximum bytes are 128.
 
-char SONG_NAME[15] = "1:hav.mp3";
+char SONG_NAME[15] = "1:cry.mp3";
 
+Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
-
 QueueHandle_t musicQueue;
 TaskHandle_t bufferTaskHandle;
 
@@ -162,39 +161,6 @@ void vplayHello(void * pvParameters)
 
 unsigned char song[5000];
 
-void vbufferSong(void * pvParameters)
-{
-    uint16_t BYTES_TO_RETRIEVE = 256;
-    //Song buffer:
-    FRESULT readResult;
-    bool ret_val = 0;
-    static unsigned long sz = Storage::getfileinfo("1:ambhalf.mp3");
-
-    static uint16_t offset = 0;
-
-    while (1) {
-
-        if ((sz - offset) > BYTES_TO_RETRIEVE) {
-            if (xSemaphoreTake(LabSPI::spi_mutex, 1000)) {
-                readResult = Storage::read("1:ambhalf.mp3", &song[offset], BYTES_TO_RETRIEVE, offset);
-                offset += BYTES_TO_RETRIEVE;
-                xSemaphoreGive(LabSPI::spi_mutex);
-                u0_dbg_printf("%d  ", offset);
-            }
-        }
-        else {
-            if (xSemaphoreTake(LabSPI::spi_mutex, 1000)) {
-                readResult = Storage::read("1:ambhalf.mp3", &song[offset], (sz - offset), offset);
-                offset = 0;
-                xSemaphoreGive(LabSPI::spi_mutex);
-                u0_dbg_printf("@");
-            }
-            u0_dbg_printf("retval = %d  first %x \n", ret_val, song[0]);
-            //vTaskSuspend(bufferTaskHandle);
-        }
-    }
-}
-
 void vgetSong(void * pvParameters)
 {
     unsigned char current_byte[READ_BYTES_FROM_FILE];  //static unsigned char *p; p = &HelloMP3[0];
@@ -261,28 +227,132 @@ void vplaySong(void * pvParameters)
                 current_count = 0;
                 j = 0;
             }
-            else {current_count += 1;}
+            else {
+                current_count += 1;
+            }
         }
     }
 }
+
+void vBTRecCommand(void * pvParameters)
+{
+    char *c = new char[1];
+    char BTMsg[5] = "";
+    bool recd = false;
+    uint8_t index = 0;
+    while (1) {
+        //Keep receiving till we get the \n message
+        while (BT.getRxQueueSize() > 0) {
+            BT.getChar(c, 5);
+            if (*c != '\n') {
+                BTMsg[index] = c[0];
+                recd = true;
+                index++;
+            }
+            else {
+                BTMsg[index] = c[0];
+                break;
+            }
+        }
+
+        //Once we receive the data, now process it
+        if (recd) {
+            bool check = validate_BT_message(BTMsg);
+            u0_dbg_printf("check = %d\n", check);
+        }
+    }
+}
+
+
+/*
+ * This function lists the names of all the songs on the memory card
+ * The limit on the name is 13 characters (as defined in ff.h file in FILINFO definition)
+ *
+ */
+void getSongListFromMemCard()
+{
+    DIR Dir;
+    FILINFO Finfo;
+    FATFS *fs;
+    FRESULT returnCode = FR_OK;
+    const char *dirPath = "1:";
+    char buffer [100]; buffer[0]='#';
+    unsigned int fileBytesTotal = 0, numFiles = 0, numDirs = 0;
+
+#if _USE_LFN
+    char Lfname[_MAX_LFN];
+    Finfo.lfname = Lfname;
+    Finfo.lfsize = sizeof(Lfname);
+#endif
+
+        f_opendir(&Dir, dirPath);
+
+        for (;;) {
+#if _USE_LFN
+            Finfo.lfname = Lfname;
+            Finfo.lfsize = sizeof(Lfname);
+#endif
+
+            returnCode = f_readdir(&Dir, &Finfo);
+            if ((FR_OK != returnCode) || !Finfo.fname[0]) {
+                break;
+            }
+
+            if (Finfo.fattrib & AM_DIR) {
+                numDirs++;
+            }
+            else {
+                numFiles++;
+                fileBytesTotal += Finfo.fsize;
+                //u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
+                sprintf(buffer,"%s%s@",buffer,&(Finfo.fname[0]));
+                //memcpy(buffer, Finfo.fname, strlen(Finfo.fname)+1);
+            }
+        }
+        sprintf(buffer,"%s\n",buffer);
+        //Now that we have the list os songs as string of characters send them to the Android App via Bluetooth
+        BTSendSongList(buffer);
+}
+void BTSendSongList(char songlist[])
+{
+
+    char *ptr = songlist;
+    while(*ptr != '\n'){
+            //BT.putChar(*ptr);
+            u0_dbg_printf("%c",*ptr);
+            ptr++;
+        }
+        //BT.putChar( '\n' );
+        u0_dbg_printf("\n");
+}
+
 int main(void)
 {
+
+    scheduler_add_task(new terminalTask(PRIORITY_HIGH));
     // Initialize MP3 decoder's SPI
     decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
     musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
     /*inits for the mp3 decoder*/
-    mp3_dreq_init(); //setting dreq as an input pin
-    mp3_hardwareReset();
-    mp3_initDecoder();
-    /*inits for the mp3 decoder END*/
+     mp3_dreq_init(); //setting dreq as an input pin
+     mp3_hardwareReset();
+     mp3_initDecoder();
+     /*inits for the mp3 decoder END*/
 
+    /*Init for Bluetooth*/
+    //BT.init(9600, 1250, 350);   //param: baud rate, RXQ sz, TXQ sz)
+    //Following function gives the list of songs on the memory card
+    getSongListFromMemCard();
+    //
     //xTaskCreate(vinitCheck, "initCheckTask", 1024, (void *) 1, 1, NULL);
     //xTaskCreate(vplayHello, "playHelloTask", 5120, (void *) 1, 2, NULL);
     xTaskCreate(vgetSong, "getSongTask", 3072, (void *) 1, 1, NULL);
-    //xTaskCreate(vbufferSong, "bufferSongTask", 4096, (void *) 1, 2, &bufferTaskHandle);
     xTaskCreate(vplaySong, "playSongTask", 3072, (void *) 1, 2, NULL);
+    //xTaskCreate(vBTRecCommand, "BTRecCommand", 1024, (void *) 1, 3, NULL);
 
     /* Start Scheduler - This will not return, and your tasks will start to run their while(1) loop */
     vTaskStartScheduler();
+    //scheduler_start();
     return 0;
 }
+
