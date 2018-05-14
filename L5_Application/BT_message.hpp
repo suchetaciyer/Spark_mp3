@@ -16,8 +16,8 @@
 using namespace std;
 
 bool validate_song_number(string temp);
-bool validate_command(string temp);
-bool validate_BT_message(char msg[]);
+int validate_command(string temp);
+int validate_BT_message(char msg[]);
 
 void BTSendSongList(char msg[]);
 

@@ -35,10 +35,11 @@
 #include "uart2.hpp"
 #include "BT_message.hpp"
 #include "ffconf.h"
+#include "utilities.h"
 
 uint8_t COUNT = READ_BYTES_FROM_FILE / TRANSMIT_BYTES_TO_DECODER;  //Divided by 128 because the decoder decodes only if maximum bytes are 128.
 
-char SONG_NAME[15] = "1:cry.mp3";
+char SONG_NAME[15] = "1:hav.mp3";
 
 Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
@@ -236,14 +237,17 @@ void vplaySong(void * pvParameters)
 
 void vBTRecCommand(void * pvParameters)
 {
-    char *c = new char[1];
-    char BTMsg[5] = "";
     bool recd = false;
     uint8_t index = 0;
     while (1) {
+        char *c = new char[1];
+        char BTMsg[5] = "";
+        recd = false;
+        index = 0;
         //Keep receiving till we get the \n message
         while (BT.getRxQueueSize() > 0) {
             BT.getChar(c, 5);
+
             if (*c != '\n') {
                 BTMsg[index] = c[0];
                 recd = true;
@@ -257,12 +261,19 @@ void vBTRecCommand(void * pvParameters)
 
         //Once we receive the data, now process it
         if (recd) {
-            bool check = validate_BT_message(BTMsg);
-            u0_dbg_printf("check = %d\n", check);
+
+            int check = validate_BT_message(BTMsg);
+            if (check == 1) {
+                u0_dbg_printf("recd start\n");
+            }
+            else if (check == 2) {
+                u0_dbg_printf("recd stop\n");
+            }
         }
+        delete c; //free the memory
+        vTaskDelay(100);
     }
 }
-
 
 /*
  * This function lists the names of all the songs on the memory card
@@ -276,7 +287,8 @@ void getSongListFromMemCard()
     FATFS *fs;
     FRESULT returnCode = FR_OK;
     const char *dirPath = "1:";
-    char buffer [100]; buffer[0]='#';
+    char buffer[100];
+    buffer[0] = '#';
     unsigned int fileBytesTotal = 0, numFiles = 0, numDirs = 0;
 
 #if _USE_LFN
@@ -285,62 +297,66 @@ void getSongListFromMemCard()
     Finfo.lfsize = sizeof(Lfname);
 #endif
 
-        f_opendir(&Dir, dirPath);
+    f_opendir(&Dir, dirPath);
 
-        for (;;) {
+    for (;;) {
 #if _USE_LFN
-            Finfo.lfname = Lfname;
-            Finfo.lfsize = sizeof(Lfname);
+        Finfo.lfname = Lfname;
+        Finfo.lfsize = sizeof(Lfname);
 #endif
 
-            returnCode = f_readdir(&Dir, &Finfo);
-            if ((FR_OK != returnCode) || !Finfo.fname[0]) {
-                break;
-            }
-
-            if (Finfo.fattrib & AM_DIR) {
-                numDirs++;
-            }
-            else {
-                numFiles++;
-                fileBytesTotal += Finfo.fsize;
-                //u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
-                sprintf(buffer,"%s%s@",buffer,&(Finfo.fname[0]));
-                //memcpy(buffer, Finfo.fname, strlen(Finfo.fname)+1);
-            }
+        returnCode = f_readdir(&Dir, &Finfo);
+        if ((FR_OK != returnCode) || !Finfo.fname[0]) {
+            break;
         }
-        sprintf(buffer,"%s\n",buffer);
-        //Now that we have the list os songs as string of characters send them to the Android App via Bluetooth
-        BTSendSongList(buffer);
+
+        if (Finfo.fattrib & AM_DIR) {
+            numDirs++;
+        }
+        else {
+            numFiles++;
+            fileBytesTotal += Finfo.fsize;
+            //u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
+            sprintf(buffer, "%s%s@", buffer, &(Finfo.fname[0]));
+            //memcpy(buffer, Finfo.fname, strlen(Finfo.fname)+1);
+        }
+    }
+    sprintf(buffer, "%s\n", buffer);
+    //Now that we have the list os songs as string of characters send them to the Android App via Bluetooth
+    BTSendSongList(buffer);
 }
 void BTSendSongList(char songlist[])
 {
-
-    char *ptr = songlist;
-    while(*ptr != '\n'){
-            //BT.putChar(*ptr);
-            u0_dbg_printf("%c",*ptr);
+   // while (1) {
+        u0_dbg_printf("sending long list!\n");
+        char *ptr = songlist;
+        while (*ptr != '\n') {
+            BT.putChar(*ptr);
+            //u0_dbg_printf("%c", *ptr);
             ptr++;
         }
-        //BT.putChar( '\n' );
-        u0_dbg_printf("\n");
+        BT.putChar('\n');
+        //delay_ms(1000);
+        //u0_dbg_printf("\n");
+   // }
+
 }
 
 int main(void)
 {
 
-    scheduler_add_task(new terminalTask(PRIORITY_HIGH));
+    //scheduler_add_task(new terminalTask(PRIORITY_HIGH));
     // Initialize MP3 decoder's SPI
-    decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
-    musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
-    /*inits for the mp3 decoder*/
+     decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
+     musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
+    // inits for the mp3 decoder
      mp3_dreq_init(); //setting dreq as an input pin
      mp3_hardwareReset();
      mp3_initDecoder();
-     /*inits for the mp3 decoder END*/
+    /*inits for the mp3 decoder END*/
 
     /*Init for Bluetooth*/
-    //BT.init(9600, 1250, 350);   //param: baud rate, RXQ sz, TXQ sz)
+    BT.init(9600, 1250, 350);   //param: baud rate, RXQ sz, TXQ sz)
     //Following function gives the list of songs on the memory card
     getSongListFromMemCard();
     //
@@ -348,11 +364,10 @@ int main(void)
     //xTaskCreate(vplayHello, "playHelloTask", 5120, (void *) 1, 2, NULL);
     xTaskCreate(vgetSong, "getSongTask", 3072, (void *) 1, 1, NULL);
     xTaskCreate(vplaySong, "playSongTask", 3072, (void *) 1, 2, NULL);
-    //xTaskCreate(vBTRecCommand, "BTRecCommand", 1024, (void *) 1, 3, NULL);
+    xTaskCreate(vBTRecCommand, "BTRecCommand", 1024, (void *) 1, 3, NULL);
 
     /* Start Scheduler - This will not return, and your tasks will start to run their while(1) loop */
     vTaskStartScheduler();
     //scheduler_start();
     return 0;
 }
-

@@ -15,32 +15,32 @@
 
 using namespace std;
 
-
 bool validate_song_number(string temp)
 {
     int song_number = atoi(temp.c_str());
-    if(song_number > 0 && song_number <100)
-        return true;
+    if (song_number > 0 && song_number < 100) return true;
     else
         return false;
 }
-bool validate_command(string temp)
+int validate_command(string temp)
 {
     int command = atoi(temp.c_str());
-    if(command == 0)
-    {
-
+    int ret =0;
+    if (command == 0) {
+       ret = 2; //stop
     }
-        //stop
-    //else if (command == 1)
-        //play
-    return true;
+    else if (command == 1) {
+        ret = 1; //play
+    }
+
+    return ret;
 }
 
-bool validate_BT_message(char msg[])
+int validate_BT_message(char msg[])
 {
     int i = 0;
     bool song_validated = false;
+    int start_stop =0;
     string temp = "";       //We can store no more than 99 songs in the list
     //Play song command comes is the form
     //  #song_number\n
@@ -51,22 +51,27 @@ bool validate_BT_message(char msg[])
             i++;
         }
         song_validated = validate_song_number(temp);
-        u0_dbg_printf("song_validated = %d",song_validated);
+        u0_dbg_printf("song_validated = %d", song_validated);
         temp = "";
+        return 3; // received song number
         i++;
     }
+    //start stop
     else if (msg[i] == '*') {
+
         i++;
         while (msg[i] != '\n') {
             temp += msg[i];
             i++;
         }
-        song_validated = validate_command(temp);
-        u0_dbg_printf("song_validated = %d",song_validated);
+
+        start_stop = validate_command(temp);
+        //u0_dbg_printf("command validated = %d",song_validated);
         temp = "";
+        return start_stop; //start stop command
         i++;
     }
-    if(song_validated)
-        return true;
-    else return false;
+    if (song_validated) return true;
+    else
+        return false;
 }
