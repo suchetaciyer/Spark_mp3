@@ -10,11 +10,22 @@
 #include "LPC17xx.h"
 #include "LabGPIO.hpp"
 #include "utilities.h"
+#include "tasks.hpp"
+
+#include "printf_lib.h"
 
 LabGPIO chipSelect = LabGPIO(1, 22);
 LabGPIO dataChipSelect = LabGPIO(1, 20);
 LabGPIO chipReset = LabGPIO(1, 19);
 LabGPIO dreqPin = LabGPIO(2, 7);
+
+uint16_t MODE = 0x4800;
+uint16_t CLOCKF = 0xBBE8; //was 9800, EBE8, B3E8, BBE8
+uint16_t VOL = 0x2222; //full vol
+uint16_t BASS = 0x0076; //was 00F6
+uint16_t AUDATA = 0xAC80; //for stereo decoding, AC45,AC80, BB80-check
+TaskHandle_t playSongTaskHandle;
+extern unsigned long song_offset;
 
 //enabling Chip select by writing a low to pin P1.22
 void mp3_cs()
@@ -74,12 +85,79 @@ bool mp3_dreq_getLevel()
 
 bool mp3_initDecoder()
 {
-    mp3_writeRequest(SCI_MODE, 0x4800);
-    mp3_writeRequest(SCI_CLOCKF, 0xBBE8); //was 9800, EBE8, B3E8, BBE8
-    mp3_writeRequest(SCI_VOL, 0x0000); //full vol
-    mp3_writeRequest(SCI_BASS, 0x0076); //was 00F6
-    mp3_writeRequest(SCI_AUDATA, 0xAC80); //for stereo decoding, AC45,AC80, BB80-check
+    mp3_writeRequest(SCI_MODE, MODE);
+    mp3_writeRequest(SCI_CLOCKF, CLOCKF); //was 9800, EBE8, B3E8, BBE8
+    mp3_writeRequest(SCI_VOL, VOL); //full vol
+    mp3_writeRequest(SCI_BASS, BASS); //was 00F6
+    mp3_writeRequest(SCI_AUDATA, AUDATA); //for stereo decoding, AC45,AC80, BB80-check
 
-    return false;
+    return true;
 }
 
+void refresh_params()
+{
+    mp3_writeRequest(SCI_MODE, MODE);
+    mp3_writeRequest(SCI_CLOCKF, CLOCKF); //was 9800, EBE8, B3E8, BBE8
+    mp3_writeRequest(SCI_VOL, VOL); //full vol
+    mp3_writeRequest(SCI_BASS, BASS); //was 00F6
+    mp3_writeRequest(SCI_AUDATA, AUDATA); //for stereo decoding, AC45,AC80, BB80-check
+}
+
+bool mp3_stop()
+{
+//    uint16_t mode = mp3_readRequest(SCI_MODE);
+//    mode |= (1<<3);
+//    mp3_writeRequest(SCI_MODE, mode); //Bit 3 set will stop decoding
+    vTaskSuspend(playSongTaskHandle);
+    song_offset = 0;
+    return true;
+}
+
+bool mp3_start()
+{
+//    uint16_t mode = mp3_readRequest(SCI_MODE);
+//    mode &= ~(1<<3);
+//    mp3_writeRequest(SCI_MODE, mode); //Bit 3 set will stop decoding
+    vTaskResume(playSongTaskHandle);
+    return true;
+}
+
+bool mp3_pause()
+{
+//    uint16_t mode = mp3_readRequest(SCI_MODE);
+//    mode |= (1<<3);
+//    mp3_writeRequest(SCI_MODE, mode); //Bit 3 set will stop decoding
+    vTaskSuspend(playSongTaskHandle);
+    return true;
+}
+
+
+//bool mp3_dec_vol()
+//{
+//    /**
+//     * Volume max = 0000
+//     * Volume min = FEFE
+//     * XXYY where XX is left channel and YY is right channel
+//     */
+//    uint16_t current_vol = mp3_readRequest(SCI_VOL);
+//    uint8_t right_ch =  current_vol;
+//    uint8_t left_ch = (current_vol >> 8);
+//    if (right_ch > 0xFE )
+//    {
+//        right_ch--;
+//        left_ch--;
+//        uint16_t new_vol = (left_ch << 8) | right_ch;
+//        mp3_writeRequest(SCI_VOL, new_vol);
+//    }
+//    else
+//    {
+//        ;
+//    }
+//    return false;
+//}
+//
+//bool mp3_inc_vol()
+//{
+//    mp3_writeRequest(SCI_MODE, 0x4800); //Bit 3 reset will stop decoding
+//    return false;
+//}

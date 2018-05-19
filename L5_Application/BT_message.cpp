@@ -8,20 +8,22 @@
 #include "printf_lib.h"
 #include "BT_message.hpp"
 #include <string>
-//#include <string.h>
+#include <string.h>
 #include <iostream>
 #include <stdlib.h>
+#include "tasks.hpp"
+
 #include "printf_lib.h"
+
 
 using namespace std;
 
-bool validate_song_number(string temp)
-{
-    int song_number = atoi(temp.c_str());
-    if (song_number > 0 && song_number < 100) return true;
-    else
-        return false;
-}
+extern char SONG_NAME[15];
+static char new_song_name[15];
+//TaskHandle_t playSongTaskHandle = NULL;
+//unsigned long song_offset=0;
+
+
 int validate_command(string temp)
 {
     int command = atoi(temp.c_str());
@@ -42,16 +44,18 @@ int validate_BT_message(char msg[])
     bool song_validated = false;
     int start_stop =0;
     string temp = "";       //We can store no more than 99 songs in the list
+
     //Play song command comes is the form
     //  #song_number\n
     if (msg[i] == '#') {
         i++;
         while (msg[i] != '\n') {
             temp += msg[i];
+            strcpy(new_song_name,temp.c_str());
+            //u0_dbg_printf(".%c ", msg[i]);
             i++;
         }
-        song_validated = validate_song_number(temp);
-        u0_dbg_printf("song_validated = %d", song_validated);
+
         temp = "";
         return 3; // received song number
         i++;
@@ -74,4 +78,12 @@ int validate_BT_message(char msg[])
     if (song_validated) return true;
     else
         return false;
+}
+
+void change_song()
+{
+    //vTaskSuspend(playSongTaskHandle);
+    strcpy(SONG_NAME,new_song_name);
+    //song_offset = 0;
+    //vTaskResume(playSongTaskHandle);
 }

@@ -21,4 +21,10 @@ bool mp3_dreq_getLevel();
 bool mp3_initDecoder();
 extern void mp3_writeRequest(uint8_t address, uint16_t data);
 extern uint16_t mp3_readRequest(uint8_t address);
+void refresh_params();
+
+bool mp3_stop();
+bool mp3_pause();
+
+bool mp3_start();
 #endif /* VS1053B_HPP_ */

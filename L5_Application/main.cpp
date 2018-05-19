@@ -38,13 +38,21 @@
 #include "utilities.h"
 
 uint8_t COUNT = READ_BYTES_FROM_FILE / TRANSMIT_BYTES_TO_DECODER;  //Divided by 128 because the decoder decodes only if maximum bytes are 128.
+//MODE RELATED VARIABLES
+extern uint16_t MODE;
+extern uint16_t CLOCKF;
+extern uint16_t VOL;
+extern uint16_t BASS;
+extern uint16_t AUDATA;
 
+unsigned long song_offset = 0;
 char SONG_NAME[15] = "1:hav.mp3";
 
 Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
 QueueHandle_t musicQueue;
 TaskHandle_t bufferTaskHandle;
+extern TaskHandle_t playSongTaskHandle;
 
 //Read the 16-bit value of a VS10xx register
 extern uint16_t mp3_readRequest(uint8_t address)
@@ -94,8 +102,8 @@ void vinitCheck(void * pvParameters)
                 count++;
                 if (count % 2 == 0) {
 
-//                    uint16_t res = mp3_readRequest(SCI_MODE);
-//                    u0_dbg_printf("MODE is %x\n", res);
+                    uint16_t res = mp3_readRequest(SCI_MODE);
+                    u0_dbg_printf("MODE is %x\n", res);
 //                    res = mp3_readRequest(SCI_CLOCKF);
 //                    u0_dbg_printf("SCI_CLOCKF is %x\n", res);
 //                    res = mp3_readRequest(SCI_VOL);
@@ -121,7 +129,6 @@ void vinitCheck(void * pvParameters)
 
 void vplayHello(void * pvParameters)
 {
-
     unsigned char *p;
 
     for (int x = 0; x < 4; x++) {
@@ -165,28 +172,27 @@ unsigned char song[5000];
 void vgetSong(void * pvParameters)
 {
     unsigned char current_byte[READ_BYTES_FROM_FILE];  //static unsigned char *p; p = &HelloMP3[0];
-    static unsigned long offset = 0;
     // int i;
     unsigned long filesize = Storage::getfileinfo(SONG_NAME);
     //u0_dbg_printf("%lu ", filesize);
     while (1) {
 
-        if ((filesize - offset) > READ_BYTES_FROM_FILE) {
+        if ((filesize - song_offset) > READ_BYTES_FROM_FILE) {
             if (xSemaphoreTake(LabSPI::spi_mutex, portMAX_DELAY)) {
-                Storage::read(SONG_NAME, &current_byte[0], READ_BYTES_FROM_FILE, offset);
+                Storage::read(SONG_NAME, &current_byte[0], READ_BYTES_FROM_FILE, song_offset);
                 xSemaphoreGive(LabSPI::spi_mutex);
                 bool sent = xQueueSend(musicQueue, &current_byte, portMAX_DELAY);
                 if (!sent) u0_dbg_printf("sf");
-                offset += READ_BYTES_FROM_FILE;
+                song_offset += READ_BYTES_FROM_FILE;
             }
         }
         else {
             if (xSemaphoreTake(LabSPI::spi_mutex, portMAX_DELAY)) {
-                Storage::read(SONG_NAME, &current_byte[0], (filesize - offset), offset);
+                Storage::read(SONG_NAME, &current_byte[0], (filesize - song_offset), song_offset);
                 xSemaphoreGive(LabSPI::spi_mutex);
                 bool sent = xQueueSend(musicQueue, &current_byte, portMAX_DELAY);
                 if (!sent) u0_dbg_printf("sf");
-                offset = 0;
+                song_offset = 0;
             }
         }
     }
@@ -209,7 +215,7 @@ void vplaySong(void * pvParameters)
             //DREQ is low while the receive buffer is full
             //You can do something else here, the bus is free...
             //Maybe set the volume or whatever...
-
+            refresh_params();
         }
 
         //Once DREQ is released (high) we can now send 32 bytes of data
@@ -262,12 +268,22 @@ void vBTRecCommand(void * pvParameters)
         //Once we receive the data, now process it
         if (recd) {
 
+            //u0_dbg_printf("%s \n",BTMsg);
+
             int check = validate_BT_message(BTMsg);
             if (check == 1) {
                 u0_dbg_printf("recd start\n");
+                //MODE = 0x4800;
+                mp3_start();
+
             }
             else if (check == 2) {
                 u0_dbg_printf("recd stop\n");
+                //MODE = 0x4808;
+                mp3_stop();
+            }
+            else if (check == 3) {
+                //u0_dbg_printf("%s \n",BTMsg);
             }
         }
         delete c; //free the memory
@@ -363,7 +379,7 @@ int main(void)
     //xTaskCreate(vinitCheck, "initCheckTask", 1024, (void *) 1, 1, NULL);
     //xTaskCreate(vplayHello, "playHelloTask", 5120, (void *) 1, 2, NULL);
     xTaskCreate(vgetSong, "getSongTask", 3072, (void *) 1, 1, NULL);
-    xTaskCreate(vplaySong, "playSongTask", 3072, (void *) 1, 2, NULL);
+    xTaskCreate(vplaySong, "playSongTask", 3072, (void *) 1, 2, &playSongTaskHandle);
     xTaskCreate(vBTRecCommand, "BTRecCommand", 1024, (void *) 1, 3, NULL);
 
     /* Start Scheduler - This will not return, and your tasks will start to run their while(1) loop */

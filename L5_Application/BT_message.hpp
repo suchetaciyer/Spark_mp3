@@ -15,10 +15,21 @@
 
 using namespace std;
 
-bool validate_song_number(string temp);
 int validate_command(string temp);
+
+/**
+ *      Commands Received from BT :
+ *      *0          ->STOP              Returns 2
+ *      *1          ->START             Returns 1
+ *      SONG_NAME   ->Play that song    Returns 3
+ *      ERROR                           Returns -1
+ */
 int validate_BT_message(char msg[]);
 
 void BTSendSongList(char msg[]);
+
+void change_song();
+
+
 
 #endif /* BT_MESSAGE_HPP_ */
