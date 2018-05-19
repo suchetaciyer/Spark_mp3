@@ -44,15 +44,15 @@ extern uint16_t CLOCKF;
 extern uint16_t VOL;
 extern uint16_t BASS;
 extern uint16_t AUDATA;
-
-unsigned long song_offset = 0;
 char SONG_NAME[15] = "1:hav.mp3";
 
 Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
 QueueHandle_t musicQueue;
 TaskHandle_t bufferTaskHandle;
-extern TaskHandle_t playSongTaskHandle;
+
+TaskHandle_t playSongTaskHandle = NULL;
+unsigned long song_offset = NULL;
 
 //Read the 16-bit value of a VS10xx register
 extern uint16_t mp3_readRequest(uint8_t address)
@@ -275,15 +275,19 @@ void vBTRecCommand(void * pvParameters)
                 u0_dbg_printf("recd start\n");
                 //MODE = 0x4800;
                 mp3_start();
-
             }
             else if (check == 2) {
                 u0_dbg_printf("recd stop\n");
                 //MODE = 0x4808;
                 mp3_stop();
             }
+            else if (check == 4) {
+                //u0_dbg_printf("%s \n",BTMsg);
+                mp3_pause();
+            }
             else if (check == 3) {
                 //u0_dbg_printf("%s \n",BTMsg);
+                change_song();
             }
         }
         delete c; //free the memory

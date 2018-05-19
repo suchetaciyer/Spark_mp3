@@ -21,6 +21,7 @@ int validate_command(string temp);
  *      Commands Received from BT :
  *      *0          ->STOP              Returns 2
  *      *1          ->START             Returns 1
+ *      *2          ->PAUSE             Returns 4
  *      SONG_NAME   ->Play that song    Returns 3
  *      ERROR                           Returns -1
  */

@@ -24,8 +24,7 @@ uint16_t CLOCKF = 0xBBE8; //was 9800, EBE8, B3E8, BBE8
 uint16_t VOL = 0x2222; //full vol
 uint16_t BASS = 0x0076; //was 00F6
 uint16_t AUDATA = 0xAC80; //for stereo decoding, AC45,AC80, BB80-check
-TaskHandle_t playSongTaskHandle;
-extern unsigned long song_offset;
+
 
 //enabling Chip select by writing a low to pin P1.22
 void mp3_cs()

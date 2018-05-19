@@ -9,6 +9,8 @@
 #define VS1053B_HPP_
 #include "stdio.h"
 #include "VS1053B_memmap.h"
+#include "tasks.hpp"
+
 
 void mp3_cs();
 void mp3_ds();
@@ -25,6 +27,8 @@ void refresh_params();
 
 bool mp3_stop();
 bool mp3_pause();
-
 bool mp3_start();
+
+extern TaskHandle_t playSongTaskHandle;
+extern unsigned long song_offset;
 #endif /* VS1053B_HPP_ */

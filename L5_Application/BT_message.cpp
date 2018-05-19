@@ -12,7 +12,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include "tasks.hpp"
-
+#include "VS1053B.hpp"
 #include "printf_lib.h"
 
 
@@ -34,7 +34,9 @@ int validate_command(string temp)
     else if (command == 1) {
         ret = 1; //play
     }
-
+    else if (command == 1) {
+        ret = 4; //pause
+    }
     return ret;
 }
 
@@ -52,7 +54,7 @@ int validate_BT_message(char msg[])
         while (msg[i] != '\n') {
             temp += msg[i];
             strcpy(new_song_name,temp.c_str());
-            //u0_dbg_printf(".%c ", msg[i]);
+            u0_dbg_printf(".%c ", msg[i]);
             i++;
         }
 
@@ -82,8 +84,8 @@ int validate_BT_message(char msg[])
 
 void change_song()
 {
-    //vTaskSuspend(playSongTaskHandle);
+    vTaskSuspend(playSongTaskHandle);
     strcpy(SONG_NAME,new_song_name);
-    //song_offset = 0;
-    //vTaskResume(playSongTaskHandle);
+    song_offset = 0;
+    vTaskResume(playSongTaskHandle);
 }
