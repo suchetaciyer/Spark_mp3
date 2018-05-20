@@ -18,24 +18,34 @@
 
 using namespace std;
 
-extern char SONG_NAME[15];
-static char new_song_name[15];
-//TaskHandle_t playSongTaskHandle = NULL;
-//unsigned long song_offset=0;
-
+extern char SONG_NAME[50];
+static char new_song_name[50];
 
 int validate_command(string temp)
 {
     int command = atoi(temp.c_str());
+    u0_dbg_printf("command = %d\n",command);
     int ret =0;
     if (command == 0) {
-       ret = 2; //stop
+       ret = 10; //stop
     }
     else if (command == 1) {
         ret = 1; //play
     }
-    else if (command == 1) {
-        ret = 4; //pause
+    else if (command == 2) {
+        ret = 2; //pause
+    }
+    else if (command == 3) {
+        ret = 3; //increase volume
+    }
+    else if (command == 4) {
+        ret = 4; //decrease volume
+    }
+    else if (command == 5) {
+        ret = 5; //fast forward
+    }
+    else if (command == 9) {
+        ret = 9; //change song
     }
     return ret;
 }
@@ -54,12 +64,12 @@ int validate_BT_message(char msg[])
         while (msg[i] != '\n') {
             temp += msg[i];
             strcpy(new_song_name,temp.c_str());
-            u0_dbg_printf(".%c ", msg[i]);
+            u0_dbg_printf("%c ", msg[i]);
             i++;
         }
 
         temp = "";
-        return 3; // received song number
+        return 9; // received song number
         i++;
     }
     //start stop
@@ -89,3 +99,5 @@ void change_song()
     song_offset = 0;
     vTaskResume(playSongTaskHandle);
 }
+
+

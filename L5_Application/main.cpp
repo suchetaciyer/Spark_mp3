@@ -44,7 +44,7 @@ extern uint16_t CLOCKF;
 extern uint16_t VOL;
 extern uint16_t BASS;
 extern uint16_t AUDATA;
-char SONG_NAME[15] = "1:hav.mp3";
+char SONG_NAME[50] = "1:Track1.mp3";
 
 Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
@@ -267,26 +267,48 @@ void vBTRecCommand(void * pvParameters)
 
         //Once we receive the data, now process it
         if (recd) {
-
+            /**
+             *      Commands Received from BT :
+             *      *0          ->STOP              Returns 10
+             *      *1          ->START             Returns 1
+             *      *2          ->PAUSE             Returns 2
+             *      *3          ->Volume ++         Returns 3
+             *      *4          ->Volume --         Returns 4
+             *      *5\n        ->Fast Forward      Returns 5
+             *      SONG_NAME   ->Play that song    Returns 9
+             *      #song_name\n
+             *
+             *      ERROR                           Returns -1
+             */
             //u0_dbg_printf("%s \n",BTMsg);
-
             int check = validate_BT_message(BTMsg);
-            if (check == 1) {
+
+            if (check == 10) {
+                u0_dbg_printf("recd stop\n");
+                mp3_stop();
+            }
+            else if (check == 1) {
                 u0_dbg_printf("recd start\n");
-                //MODE = 0x4800;
                 mp3_start();
             }
             else if (check == 2) {
-                u0_dbg_printf("recd stop\n");
-                //MODE = 0x4808;
-                mp3_stop();
-            }
-            else if (check == 4) {
-                //u0_dbg_printf("%s \n",BTMsg);
+                u0_dbg_printf("recd pause\n");
                 mp3_pause();
             }
             else if (check == 3) {
-                //u0_dbg_printf("%s \n",BTMsg);
+                u0_dbg_printf("++vol\n");
+                mp3_inc_vol();
+            }
+            else if (check == 4) {
+                u0_dbg_printf("--vol\n");
+                mp3_dec_vol();
+            }
+            else if (check == 5) {
+                u0_dbg_printf("fastfwd\n");
+                mp3_fast_forward();
+            }
+            else if (check == 9) {
+                u0_dbg_printf("change song\n");
                 change_song();
             }
         }
@@ -323,6 +345,8 @@ void getSongListFromMemCard()
 #if _USE_LFN
         Finfo.lfname = Lfname;
         Finfo.lfsize = sizeof(Lfname);
+//        u0_dbg_printf("*%s\n",Lfname);
+//        u0_dbg_printf("**%s\n",Finfo.lfname);
 #endif
 
         returnCode = f_readdir(&Dir, &Finfo);
@@ -336,7 +360,7 @@ void getSongListFromMemCard()
         else {
             numFiles++;
             fileBytesTotal += Finfo.fsize;
-            //u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
+            u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
             sprintf(buffer, "%s%s@", buffer, &(Finfo.fname[0]));
             //memcpy(buffer, Finfo.fname, strlen(Finfo.fname)+1);
         }
@@ -347,18 +371,18 @@ void getSongListFromMemCard()
 }
 void BTSendSongList(char songlist[])
 {
-   // while (1) {
-        u0_dbg_printf("sending long list!\n");
-        char *ptr = songlist;
-        while (*ptr != '\n') {
-            BT.putChar(*ptr);
-            //u0_dbg_printf("%c", *ptr);
-            ptr++;
-        }
-        BT.putChar('\n');
-        //delay_ms(1000);
-        //u0_dbg_printf("\n");
-   // }
+    // while (1) {
+    u0_dbg_printf("sending long list!\n");
+    char *ptr = songlist;
+    while (*ptr != '\n') {
+        BT.putChar(*ptr);
+        //u0_dbg_printf("%c", *ptr);
+        ptr++;
+    }
+    BT.putChar('\n');
+    //delay_ms(1000);
+    //u0_dbg_printf("\n");
+    // }
 
 }
 
@@ -367,12 +391,12 @@ int main(void)
 
     //scheduler_add_task(new terminalTask(PRIORITY_HIGH));
     // Initialize MP3 decoder's SPI
-     decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
-     musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
+    decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
+    musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
     // inits for the mp3 decoder
-     mp3_dreq_init(); //setting dreq as an input pin
-     mp3_hardwareReset();
-     mp3_initDecoder();
+    mp3_dreq_init(); //setting dreq as an input pin
+    mp3_hardwareReset();
+    mp3_initDecoder();
     /*inits for the mp3 decoder END*/
 
     /*Init for Bluetooth*/

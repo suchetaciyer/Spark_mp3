@@ -25,12 +25,11 @@
 #define SCI_AICTRL1 0x0D
 #define SCI_AICTRL2 0x0E
 #define SCI_AICTRL3 0x0F
+#define playSpeed 0x1e04
 
 //commands
 #define READ 0x03
 #define WRITE 0x02
-
-
 
 //static uint8_t SEND_NUM_BYTES = 32;
 static uint16_t READ_BYTES_FROM_FILE = 4096;
