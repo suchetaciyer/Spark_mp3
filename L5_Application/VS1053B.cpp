@@ -23,8 +23,8 @@ uint16_t CLOCKF = 0xBBE8; //was 9800, EBE8, B3E8, BBE8
 volatile uint16_t VOL = 0x2222; //full vol
 uint16_t BASS = 0x0076; //was 00F6
 uint16_t AUDATA = 0xAC80; //for stereo decoding, AC45,AC80, BB80-check
-uint16_t local_playspeed = 1;
-uint16_t SS_DO_NOT_JUMP;
+//uint16_t local_playspeed = 1;
+uint16_t STATUS;
 
 
 //enabling Chip select by writing a low to pin P1.22
@@ -90,7 +90,10 @@ bool mp3_initDecoder()
     mp3_writeRequest(SCI_VOL, VOL); //full vol
     mp3_writeRequest(SCI_BASS, BASS); //was 00F6
     mp3_writeRequest(SCI_AUDATA, AUDATA); //for stereo decoding, AC45,AC80, BB80-check
-    //mp3_writeRequest(playSpeed, local_playspeed);
+    //STATUS = mp3_readRequest(SCI_STATUS);
+
+    //if(!((STATUS>>15)&(0x01)))
+     //   mp3_writeRequest(playSpeed, local_playspeed);
 
     return true;
 }
@@ -102,7 +105,8 @@ void refresh_params()
     mp3_writeRequest(SCI_VOL, VOL); //full vol
     mp3_writeRequest(SCI_BASS, BASS); //was 00F6
     mp3_writeRequest(SCI_AUDATA, AUDATA); //for stereo decoding, AC45,AC80, BB80-check
-    SS_DO_NOT_JUMP = mp3_readRequest(SCI_STATUS);
+    //STATUS = mp3_readRequest(SCI_STATUS);
+    //mp3_writeRequest(playSpeed, local_playspeed);
 }
 
 bool mp3_stop()
@@ -114,7 +118,7 @@ bool mp3_stop()
 
 bool mp3_start()
 {
-    local_playspeed = 1;
+    //local_playspeed = 1;
     vTaskResume(playSongTaskHandle);
     return true;
 }
@@ -153,7 +157,8 @@ bool mp3_inc_vol()
 
 bool mp3_fast_forward()
 {
-    local_playspeed = 3;
+    //local_playspeed = 3;
+    song_offset += (4096*4);
     return true;
 }
 
