@@ -14,8 +14,6 @@
 
 using namespace std;
 
-int validate_command(string temp);
-
 /**
  *      Commands Received from BT :
  *      *0          ->STOP              Returns 0
@@ -29,10 +27,18 @@ int validate_command(string temp);
  *
  *      ERROR                           Returns -1
  */
+int validate_command(string temp);
+
+/*
+ *      We can store no more than 99 songs in the list
+ */
 int validate_BT_message(char msg[]);
 
-void BTSendSongList(char msg[]);
-
+/*
+ * When the command to change song is received,
+ * change the file name being fetched and reset offset to 0 so
+ * that the new song plays from beginning
+ */
 void change_song();
 
 #endif /* BT_MESSAGE_HPP_ */

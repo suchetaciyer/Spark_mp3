@@ -44,7 +44,7 @@ extern uint16_t CLOCKF;
 extern uint16_t VOL;
 extern uint16_t BASS;
 extern uint16_t AUDATA;
-char SONG_NAME[50] = "1:Track1.mp3";
+char SONG_NAME[50] = "1:Track.mp3";
 
 Uart2& BT = Uart2::getInstance();
 LabSPI decoderSPI;
@@ -53,6 +53,9 @@ TaskHandle_t bufferTaskHandle;
 
 TaskHandle_t playSongTaskHandle = NULL;
 unsigned long song_offset = NULL;
+
+void BTSendSongList(char msg[]);
+
 
 //Read the 16-bit value of a VS10xx register
 extern uint16_t mp3_readRequest(uint8_t address)
@@ -98,25 +101,11 @@ void vinitCheck(void * pvParameters)
         if (xSemaphoreTake(LabSPI::spi_mutex, 1000)) {
             if (mp3_dreq_getLevel()) {
                 mp3_cs(); //do a chip select
-
                 count++;
                 if (count % 2 == 0) {
-
                     uint16_t res = mp3_readRequest(SCI_MODE);
                     u0_dbg_printf("MODE is %x\n", res);
-//                    res = mp3_readRequest(SCI_CLOCKF);
-//                    u0_dbg_printf("SCI_CLOCKF is %x\n", res);
-//                    res = mp3_readRequest(SCI_VOL);
-//                    u0_dbg_printf("SCI_VOL is %x\n", res);
-//                    res = mp3_readRequest(SCI_BASS);
-//                    u0_dbg_printf("SCI_BASS is %x\n", res);
-
-//                      uint16_t sample = mp3_readRequest(SCI_HDAT1);
-//                      u0_dbg_printf("SCI_HDAT1 is %x\n", sample);
-//                      sample = mp3_readRequest(SCI_HDAT0);
-//                      u0_dbg_printf("SCI_HDAT0 is %x\n", sample);
                 }
-
                 mp3_ds(); // Assert a HIGH signal to de-assert the CS
             }
             xSemaphoreGive(LabSPI::spi_mutex);
@@ -212,9 +201,9 @@ void vplaySong(void * pvParameters)
         uint32_t j_max = (i_plus_one * TRANSMIT_BYTES_TO_DECODER);
 
         while (!mp3_dreq_getLevel()) {
-            //DREQ is low while the receive buffer is full
-            //You can do something else here, the bus is free...
-            //Maybe set the volume or whatever...
+            /*DREQ is low while the receive buffer is full,
+             * we can do something else here, the bus is free.
+             * */
             refresh_params();
         }
 
@@ -240,6 +229,21 @@ void vplaySong(void * pvParameters)
         }
     }
 }
+
+/*
+ * This task receives the commands given from the App via Bluetooth.
+ *      Valid Commands Received from BT :
+ *      *0          ->STOP              Returns 10
+ *      *1          ->START             Returns 1
+ *      *2          ->PAUSE             Returns 2
+ *      *3          ->Volume ++         Returns 3
+ *      *4          ->Volume --         Returns 4
+ *      *5\n        ->Fast Forward      Returns 5
+ *      SONG_NAME   ->Play that song    Returns 9
+ *      #song_name\n (format)
+ *
+ *      ERROR                           Returns -1
+ */
 
 void vBTRecCommand(void * pvParameters)
 {
@@ -267,48 +271,28 @@ void vBTRecCommand(void * pvParameters)
 
         //Once we receive the data, now process it
         if (recd) {
-            /**
-             *      Commands Received from BT :
-             *      *0          ->STOP              Returns 10
-             *      *1          ->START             Returns 1
-             *      *2          ->PAUSE             Returns 2
-             *      *3          ->Volume ++         Returns 3
-             *      *4          ->Volume --         Returns 4
-             *      *5\n        ->Fast Forward      Returns 5
-             *      SONG_NAME   ->Play that song    Returns 9
-             *      #song_name\n
-             *
-             *      ERROR                           Returns -1
-             */
-            //u0_dbg_printf("%s \n",BTMsg);
+
             int check = validate_BT_message(BTMsg);
 
             if (check == 10) {
-                u0_dbg_printf("recd stop\n");
                 mp3_stop();
             }
             else if (check == 1) {
-                u0_dbg_printf("recd start\n");
                 mp3_start();
             }
             else if (check == 2) {
-                u0_dbg_printf("recd pause\n");
                 mp3_pause();
             }
             else if (check == 3) {
-                u0_dbg_printf("++vol\n");
                 mp3_inc_vol();
             }
             else if (check == 4) {
-                u0_dbg_printf("--vol\n");
                 mp3_dec_vol();
             }
             else if (check == 5) {
-                u0_dbg_printf("fastfwd\n");
                 mp3_fast_forward();
             }
             else if (check == 9) {
-                u0_dbg_printf("change song\n");
                 change_song();
             }
         }
@@ -320,6 +304,7 @@ void vBTRecCommand(void * pvParameters)
 /*
  * This function lists the names of all the songs on the memory card
  * The limit on the name is 13 characters (as defined in ff.h file in FILINFO definition)
+ * This function runs only once when the music player starts
  *
  */
 void getSongListFromMemCard()
@@ -345,8 +330,6 @@ void getSongListFromMemCard()
 #if _USE_LFN
         Finfo.lfname = Lfname;
         Finfo.lfsize = sizeof(Lfname);
-//        u0_dbg_printf("*%s\n",Lfname);
-//        u0_dbg_printf("**%s\n",Finfo.lfname);
 #endif
 
         returnCode = f_readdir(&Dir, &Finfo);
@@ -360,52 +343,56 @@ void getSongListFromMemCard()
         else {
             numFiles++;
             fileBytesTotal += Finfo.fsize;
-            u0_dbg_printf("orig = %s\n", &(Finfo.fname[0]));
             sprintf(buffer, "%s%s@", buffer, &(Finfo.fname[0]));
-            //memcpy(buffer, Finfo.fname, strlen(Finfo.fname)+1);
         }
     }
     sprintf(buffer, "%s\n", buffer);
     //Now that we have the list os songs as string of characters send them to the Android App via Bluetooth
     BTSendSongList(buffer);
 }
+
+
 void BTSendSongList(char songlist[])
 {
     // while (1) {
-    u0_dbg_printf("sending long list!\n");
+    u0_dbg_printf("Sent song list to app!\n");
     char *ptr = songlist;
     while (*ptr != '\n') {
         BT.putChar(*ptr);
-        //u0_dbg_printf("%c", *ptr);
         ptr++;
     }
     BT.putChar('\n');
-    //delay_ms(1000);
-    //u0_dbg_printf("\n");
-    // }
-
 }
 
 int main(void)
 {
 
     //scheduler_add_task(new terminalTask(PRIORITY_HIGH));
+
     // Initialize MP3 decoder's SPI
-    decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);                //plck by 48 is passed (2MHz) (3,4 MHz sometimes works, no more)
+    decoderSPI.init(decoderSPI.SSP1, 8, decoderSPI.Mode_SPI, 96);
+
     musicQueue = xQueueCreate(1, sizeof(char[READ_BYTES_FROM_FILE]));
-    // inits for the mp3 decoder
-    mp3_dreq_init(); //setting dreq as an input pin
+
+    // Initialization of the mp3 decoder
+    mp3_dreq_init();
     mp3_hardwareReset();
     mp3_initDecoder();
-    /*inits for the mp3 decoder END*/
 
-    /*Init for Bluetooth*/
+
+    // Initialization of the Bluetooth
     BT.init(9600, 1250, 350);   //param: baud rate, RXQ sz, TXQ sz)
+
+
     //Following function gives the list of songs on the memory card
     getSongListFromMemCard();
-    //
-    //xTaskCreate(vinitCheck, "initCheckTask", 1024, (void *) 1, 1, NULL);
-    //xTaskCreate(vplayHello, "playHelloTask", 5120, (void *) 1, 2, NULL);
+
+#if 0
+    //Tasks that we ran initially to check if the decoder is working
+    xTaskCreate(vinitCheck, "initCheckTask", 1024, (void *) 1, 1, NULL);
+    xTaskCreate(vplayHello, "playHelloTask", 5120, (void *) 1, 2, NULL);
+#endif
+
     xTaskCreate(vgetSong, "getSongTask", 3072, (void *) 1, 1, NULL);
     xTaskCreate(vplaySong, "playSongTask", 3072, (void *) 1, 2, &playSongTaskHandle);
     xTaskCreate(vBTRecCommand, "BTRecCommand", 1024, (void *) 1, 3, NULL);
